@@ -14,9 +14,46 @@ var browser = {
     }
 };
 
-var utils = {
+var replacer = {
+    init: function() {
+        this._compile_regexes_and_replace();
+    },
+
+    _compile_regexes_and_replace: function() {
+        appAPI.db.async.get( 'newsasaurus', function( db_regexes ) {
+
+            // TODO: make the rx_quoter optional (developers++)
+            var rx_quoter = /([.?*+^$[\]\\(){}|-])/g;
+
+            for ( var group in db_regexes ) {
+                // Ignore prototypes
+                if ( !db_regexes.hasOwnProperty( group ) ) { continue }
+                var group_regexes = db_regexes[group];
+
+                for ( var rx in group_regexes ) {
+                    if ( !group_regexes.hasOwnProperty( rx ) ) { continue }
+
+                    _rx = rx.replace( rx_quoter, "\\$1" );
+                    // TODO: would compiling one giant regex be faster?
+                    replacer.regexes.push(
+                        [ new RegExp( _rx, "gi" ), group_regexes[rx] ]
+                    );
+                }
+            }
+
+            replacer.replace(document.getElementsByTagName('*'));
+
+        } );
+    },
+    regexes: [],
+
     replace : function(parents) {
         // TODO: prompt user
+        var regexes   = this.regexes;
+        var rx_length = regexes.length;
+
+        if ( !rx_length ) { return }
+
         for ( var i = 0; i < parents.length; i++ ) {
             if ( /style|script|input/i.test( parents[i].tagName ) ) { continue }
 
@@ -24,7 +61,6 @@ var utils = {
             for ( var j = 0; j < children.length; j++ ) {
                 /* TODO:
                  * Handle inputs appropriately
-                 * compile regexes
                  * abstract this function
                  * title text
                  */
@@ -35,21 +71,9 @@ var utils = {
                     if ( ! /\S/.test(text) ) { continue }
 
                     // TODO: Preserve Case
-                    text = text.replace(/witnesses/gi,     'these guys I know')
-                               .replace(/allegedly/gi,     'kinda probably')
-                               .replace(/Tellurium/gi,     'smelly')
-                               .replace(/new study/gi,     'tumblr post')
-                               .replace(/rebuild/gi,        'avenge')
-                               .replace(/space/gi,            'spaaace')
-                               .replace(/google glass/gi,  'virtual boy')
-                               .replace(/smartphone/gi,    'pokédex')
-                               .replace(/electric/gi,        'atomic')
-                               .replace(/senator/gi,        'elf-lord')
-                               .replace(/car/gi,            'cat')
-                               .replace(/election/gi,        'eating contest')
-                               .replace(/congressional leader/gi, 'river spirit')
-                               .replace(/homeland security/gi, 'homestar runner')
-                               .replace(/could not be reached for comment/gi, 'is guilty and everyone knows it');
+                    for ( var k = 0; k < rx_length; k++ ) {
+                        text = text.replace( regexes[k][0], regexes[k][1] );
+                    }
                     // child.text(text); Fix your bug jquery!
                     // TODO: work in IE
                     child.textContent = text;
@@ -63,9 +87,8 @@ appAPI.ready(function($) {
     // Place your code here (you can also define new functions above this scope)
     // The $ object is the extension's jQuery object
 
-    utils.replace(document.getElementsByTagName('*'));
-
     browser.init();
+    replacer.init();
 
 
 });
